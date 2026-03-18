@@ -1,0 +1,13 @@
+version = 0.1
+
+[develop.deploy.parameters]
+stack_name = "pedidos-especiales-develop"
+resolve_s3 = true
+s3_prefix = "pedidos-especiales-develop"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_NAMED_IAM"
+
+parameter_overrides = "Environment=\"develop\" DBUri=\"\" DBName=\"\" CollectionResponse=\"\" CollectionOrders=\"\" DevEnv=\"\" ApiKeyDevEpicor=\"\" AuthDevEpicor=\"\" UriDevEpicor=\"\" ApiKeyProdEpicor=\"\" UriProdEpicor=\"\" AuthGetDescSp=\"\" SqlServer=\"\" SqlUser=\"\" SqlPass=\"\" SqlDb=\"\" SqlDbPrueba=\"\""
+
+image_repositories = []

@@ -1,0 +1,645 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  stock-price
+
+Globals:
+  Function:
+    Timeout: 3
+    LoggingConfig:
+      LogFormat: JSON
+
+# Variables de entorno globales
+Parameters:
+  Environment:
+    Type: String
+    Default: develop
+  # ENV FOR DATABASE
+  DBUri:
+    Type: String
+  DBName:
+    Type: String
+  CollectionResponse:
+    Type: String
+  CollectionOrders:
+    Type: String
+
+
+  # ENV FOR LIVERPOOL-EPICOR
+  DevEnv:
+    Type: String
+  ApiKeyDevEpicor:
+    Type: String
+  AuthDevEpicor:
+    Type: String
+  UriDevEpicor:
+    Type: String
+  ApiKeyProdEpicor:
+    Type: String
+  UriProdEpicor:
+    Type: String
+  AuthGetDescSp:
+    Type: String
+  
+  ## ENV FOR SQL
+  SqlServer:
+    Type: String
+  SqlUser:
+    Type: String
+  SqlPass:
+    Type: String
+  SqlDb:
+    Type: String
+  SqlDbPrueba:
+    Type: String
+
+
+ 
+Resources:
+  # ------------------ Roles ----------- 
+  LambdaExecutionRoleS3:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "LambdaExecutionRoleS3PE-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "InvokeLambdaPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "lambda:InvokeFunction"  # Permite invocar la Lambda `ReadFile`
+                Resource: "*"  # Permite invocar cualquier función Lambda
+              - Effect: "Allow"
+                Action:
+                  - "logs:*"  # Permiso para escribir logs en CloudWatch
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "cloudformation:DescribeStacks"  # Permitir describir pilas de CloudFormation
+                Resource: "*"  # Permitir en todos los recursos de CloudFormation
+        - PolicyName: CognitoListUsersPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:ListUsers
+                  - cognito-idp:AdminAddUserToGroup
+                  - cognito-idp:ListGroups
+                  - cognito-idp:GetGroup 
+                  - cognito-idp:AdminListGroupsForUser
+                  - cognito-idp:ListUsersInGroup
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: "*"
+  
+  LambdaExecutionRoleTrigger:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "LambdaExecutionRoleTriggerPE-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "InvokeLambdaPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "lambda:InvokeFunction"  # Permite invocar la Lambda `ReadFile`
+                Resource: "*"  # Permite invocar cualquier función Lambda
+              - Effect: "Allow"
+                Action:
+                  - "logs:*"  # Permiso para escribir logs en CloudWatch
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "cloudformation:DescribeStacks"  # Permitir describir pilas de CloudFormation
+                Resource: "*"  # Permitir en todos los recursos de CloudFormation
+  
+  CloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "CloudWatchRolePE-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+      Policies:
+        - PolicyName: ShopifyLambdaCloudWatchPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+    
+  AppSyncServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "AppSyncServiceRolePE-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service: "appsync.amazonaws.com"
+      # Policies:
+        # - PolicyName: "AppSyncLambdaInvokePolicy"
+        #   PolicyDocument:
+        #     Version: "2012-10-17"
+        #     Statement:
+        #       - Action:
+        #           - "lambda:InvokeFunction"
+        #         Effect: "Allow"
+        #         Resource: !GetAtt ResolverAppsync.Arn
+
+  # ------------------ Lambdas -----------
+
+  # -- Api Gateway Endpoints
+
+  GetOrders:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "GetOrdersPE-${Environment}"
+      CodeUri: ./Endpoints/Orders/GetOrdersPE/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn   # Asignación del rol con permisos de S3
+      Runtime: python3.13
+      Environment:
+        Variables:
+          MONGO_URI: !Ref DBUri
+          BD_NAME: !Ref DBName
+          COLLECTION_ORDERS: !Ref CollectionOrders
+      Events:
+        GetOrders:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /getOrdersPe
+            Method: GET
+
+  GetUsers:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "GetUsersPE-${Environment}"
+      CodeUri: ./Endpoints/Users/GetUsers/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn   # Asignación del rol con permisos de S3
+      Runtime: python3.13
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref UserPoolPedidosEspeciales
+      Events:
+        GetUsers:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /getUsers
+            Method: GET
+  
+  GetUsersGroups:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "GetUsersGroupsPE-${Environment}"
+      CodeUri: ./Endpoints/Users/GetUsersGroups/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn   # Asignación del rol con permisos de S3
+      Runtime: python3.13
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref UserPoolPedidosEspeciales
+      Events:
+        GetUsersGroups:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /getUsersGroups
+            Method: GET
+  
+  RequestPermissions:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "RequestPermissionsPE-${Environment}"
+      CodeUri: ./Endpoints/Users/RequestPermissions/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn   # Asignación del rol con permisos de S3
+      Runtime: python3.13
+      Timeout: 60
+      Events:
+        RequestPermissions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /requestPermissions
+            Method: POST
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref UserPoolPedidosEspeciales
+
+  AcceptPermissions:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "AcceptPermissionsPE-${Environment}"
+      CodeUri: ./Endpoints/Users/AcceptPermissions/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn   # Asignación del rol con permisos de S3
+      Runtime: python3.13
+      Timeout: 60
+      Events:
+        AcceptPermissions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /acceptPermissions
+            Method: POST
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref UserPoolPedidosEspeciales
+
+  
+  # -- Apsync functions
+  # ResolverAppsync:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     FunctionName: !Sub "ResolverAppsyncPE-${Environment}"
+  #     CodeUri: ./Appsync/ResolverAppsync/
+  #     Handler: app.lambda_handler
+  #     Runtime: python3.13
+  #     MemorySize: 128
+  #     Timeout: 60
+  #     Role: !GetAtt AppSyncServiceRole.Arn
+  #     Policies:
+  #       - AWSLambdaBasicExecutionRole
+  #     Environment:
+  #       Variables:
+  #         APPSYNC_API_ID: !GetAtt WSPedidosEspecialesApi.ApiId   # Guardamos el API ID en las variables de entorno
+  #         APPSYNC_API_KEY: !GetAtt WSPedidosEspecialesApiKey.ApiKey
+  #         REGION: !Ref AWS::Region  # Usamos la región actual de AWS
+  #         MONGO_URI: !Ref DBUri
+  #         BD_NAME: !Ref DBName
+  #         COLLECTION_RESPONSE: !Ref CollectionResponse
+
+
+  
+  # ------------------ API GATEWAY -----------
+  PedidosEspecialesAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: "PedidosEspecialesAPI"
+      StageName: !Sub "${Environment}"
+      Cors:
+        AllowMethods: "'OPTIONS,POST,GET'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+      DefinitionBody:
+        swagger: "2.0"
+        info:
+          title: "PedidosEspecialesAPI"
+          version: "1.0"
+        paths:
+          /getOrdersPe:
+            get:
+              summary: "Obtener las ordenes"
+              produces:
+                - "application/json"
+             
+              responses:
+                "200":
+                  description: "Detalle de procesos"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetOrders.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+          /getUsers:
+            get:
+              summary: "Obtener usuarios"
+              produces:
+                - "application/json"
+              parameters:
+                - name: "limit"
+                  in: "query"
+                  required: false
+                  type: "integer"
+                  description: "Cantidad de usuarios por página"
+                - name: "page"
+                  in: "query"
+                  required: false
+                  type: "integer"
+                  description: "Cantidad de usuarios por página"
+              responses:
+                "200":
+                  description: "Lista de productis"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetUsers.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+          /getUsersGroups:
+            get:
+              summary: "Obtener grupos deusuarios"
+              produces:
+                - "application/json"
+              parameters:
+                - name: "flag"
+                  in: "query"
+                  required: false
+                  type: "string"
+                  description: "Cantidad de gurpos de usuarios"
+              responses:
+                "200":
+                  description: "Lista de grupos"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetUsersGroups.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+          /requestPermissions:
+            post:
+              summary: "Solicitar permiso a los usuarios Admin"
+              consumes:
+                - "multipart/form-data"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Archivo subido con éxito"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RequestPermissions.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+          /acceptPermissions:
+            post:
+              summary: "Aceptar permiso a los usuarios Admin"
+              consumes:
+                - "multipart/form-data"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Archivo subido con éxito"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AcceptPermissions.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+          
+  # ------------------ API GATEWAY PERMISSIONS -----------
+  ApiGatewayInvokeLambdaPermissionOrdersPe:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref GetOrders
+      Principal: "apigateway.amazonaws.com"
+
+  ApiGatewayInvokeLambdaPermissionUsers:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref GetUsers
+      Principal: "apigateway.amazonaws.com"
+
+  ApiGatewayInvokeLambdaPermissionUsersGroups:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref GetUsersGroups
+      Principal: "apigateway.amazonaws.com"
+
+  ApiGatewayInvokeLambdaPermissionRequestPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref RequestPermissions
+      Principal: "apigateway.amazonaws.com"
+
+  ApiGatewayInvokeLambdaPermissionAcceptPermissions:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref AcceptPermissions
+      Principal: "apigateway.amazonaws.com"
+
+
+  # ------------------ API GRAPHQL -----------
+  # WSPedidosEspecialesApi:
+  #   Type: AWS::AppSync::GraphQLApi
+  #   Properties:
+  #     Name: !Sub "WSPedidosEspecialesApi-${Environment}"
+  #     AuthenticationType: API_KEY  # Cambia de NONE a API_KEY
+  #     XrayEnabled: true
+
+  # WSPedidosEspecialesApiKey:
+  #   Type: AWS::AppSync::ApiKey
+  #   Properties:
+  #     ApiId: !GetAtt WSPedidosEspecialesApi.ApiId
+  #     Expires: 1773871405 # Expira en 1 año (en segundos)
+  #   DependsOn:
+  #   - WSPedidosEspecialesApi  # Asegura que la API se cree antes de crear la API Key
+
+  # AppSyncSchema:
+  #   Type: AWS::AppSync::GraphQLSchema
+  #   Properties:
+  #     ApiId: !GetAtt WSPedidosEspecialesApi.ApiId
+  #     Definition: |
+  #       type Response {
+  #         status: String
+  #         process_subid: String
+  #         ecommerce: String
+  #         product_sku: String
+  #         message: String
+  #       }
+
+  #       type Mutation {
+  #         createResponse(
+  #           status: String!,
+  #           process_subid: String!,
+  #           ecommerce: String!,
+  #           product_sku: String!,
+  #           message: String!
+  #         ): Response @aws_api_key
+  #       }
+
+  #       type Query {
+  #         getPedidosEspeciales(product_sku: String!): Response
+  #       }
+
+  #       type Subscription {
+  #         onCreateResponse(process_subid: String!): Response
+  #           @aws_subscribe(mutations: ["createResponse"])
+  #       }
+
+  #       schema {
+  #         query: Query
+  #         mutation: Mutation
+  #         subscription: Subscription
+  #       }
+  #   DependsOn:
+  #     - WSPedidosEspecialesApi
+
+  # AppSyncLambdaDataSource:
+  #   Type: AWS::AppSync::DataSource
+  #   Properties:
+  #     ApiId: !GetAtt WSPedidosEspecialesApi.ApiId
+  #     Name: !Sub "LambdaDataSourcePe${Environment}"
+  #     Type: AWS_LAMBDA
+  #     LambdaConfig:
+  #       LambdaFunctionArn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:ResolverAppsync-${Environment}"
+  #     ServiceRoleArn: !GetAtt AppSyncServiceRole.Arn
+
+  # AppSyncCreateResponseResolver:
+  #   Type: AWS::AppSync::Resolver
+  #   Properties:
+  #     ApiId: !GetAtt WSPedidosEspecialesApi.ApiId
+  #     TypeName: Mutation
+  #     FieldName: createResponse
+  #     DataSourceName: !GetAtt AppSyncLambdaDataSource.Name
+  #     RequestMappingTemplate: |
+  #       {
+  #         "version": "2018-05-29",
+  #         "operation": "Invoke",
+  #         "payload": {
+  #           "status": "$ctx.args.status",
+  #           "process_subid": "$ctx.args.process_subid",
+  #           "ecommerce": "$ctx.args.ecommerce",
+  #           "product_sku": "$ctx.args.product_sku",
+  #           "message": "$ctx.args.message"
+  #         }
+  #       }
+  #     ResponseMappingTemplate: |
+  #       #if($ctx.error)
+  #         $util.error($ctx.error.message, $ctx.error.type)
+  #       #else
+  #         $util.toJson($ctx.result)
+  #       #end
+    
+  # ------------------ COGNITO -----------
+  UserPoolPedidosEspeciales:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "UserPoolPedidosEspeciales-${Environment}"
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      MfaConfiguration: 'OFF'
+      UsernameAttributes:
+        - email
+      LambdaConfig:
+        PostConfirmation: !GetAtt AddUserToGroup.Arn
+
+  UserPoolClientPedidosEspeciales:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "UserPoolClientPedidosEspeciales-${Environment}"
+      UserPoolId: !Ref UserPoolPedidosEspeciales
+      GenerateSecret: false
+
+  IdentityPoolPedidosEspeciales:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: !Sub "IdentityPoolPedidosEspeciales-${Environment}"
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+        - ClientId: !Ref UserPoolClientPedidosEspeciales
+          ProviderName: !Sub cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolPedidosEspeciales}
+
+
+  UserGroupEditor:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Editor
+      Description: Acceso a editar
+      Precedence: 11
+      UserPoolId: !Ref UserPoolPedidosEspeciales
+
+  UserGroupAdmin:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Admin
+      Description: Acceso total a todas las funcionalidades
+      Precedence: 0
+      UserPoolId: !Ref UserPoolPedidosEspeciales
+
+  UserGroupViewer:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Viewer
+      Description: Grupo por defecto para nuevos usuarios
+      Precedence: 99
+      UserPoolId: !Ref UserPoolPedidosEspeciales
+
+  # ------------------ Extra infraestructure -----------
+
+
+  #Crear el trigger para que al momento de crear un usuario lo meta al grupo Default
+  AddUserToGroup:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "AddUserToGroupPE-${Environment}"
+      CodeUri: ./Endpoints/Users/AddUserToGroup/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn   # Asignación del rol con permisos de S3
+      Runtime: python3.13
+      Environment:
+        Variables:
+          DEFAULT_GROUP: Viewer
+       
+  PermissionForAddUserToGroup:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AddUserToGroup
+      Action: lambda:InvokeFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPoolPedidosEspeciales}
+
