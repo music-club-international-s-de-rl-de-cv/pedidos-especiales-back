@@ -41,7 +41,7 @@ def lambda_handler(event, context):
             }
 
         # Obtener todos los procesos
-        orders = list(collection_orders.find({"marketplace": "liverpool"}, {"_id": 0}))
+        orders = list(collection_orders.find({}, {"_id": 0}))
 
         # Convertir los campos datetime a string ISO 8601
         orders = [convert_datetime_to_str(order) for order in orders]
