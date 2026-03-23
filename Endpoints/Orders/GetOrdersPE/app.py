@@ -4,7 +4,8 @@ import os
 import boto3
 import pymongo
 from datetime import datetime
-
+from bson import Binary
+import base64
 
 # Configuración de MongoDB
 MONGO_URI =os.environ.get("MONGO_URI")
@@ -18,10 +19,15 @@ collection_orders = db[COLLECTION_ORDERS]
 
 
 def convert_datetime_to_str(document):
-    """Convierte los campos datetime a string ISO 8601 en el documento."""
-    for key, value in document.items():
-        if isinstance(value, datetime):
-            document[key] = value.isoformat()
+    """Convierte recursivamente los campos datetime a string ISO 8601."""
+    if isinstance(document, dict):
+        return {key: convert_datetime_to_str(value) for key, value in document.items()}
+    elif isinstance(document, list):
+        return [convert_datetime_to_str(item) for item in document]
+    elif isinstance(document, datetime):
+        return document.isoformat()
+    elif isinstance(document, Binary):
+        return base64.b64encode(document).decode("utf-8")
     return document
 
 
@@ -41,7 +47,7 @@ def lambda_handler(event, context):
             }
 
         # Obtener todos los procesos
-        orders = list(collection_orders.find({"marketplace": "liverpool"}, {"_id": 0}))
+        orders = list(collection_orders.find({}, {"_id": 0})) #{"marketplace": "liverpool"}
 
         # Convertir los campos datetime a string ISO 8601
         orders = [convert_datetime_to_str(order) for order in orders]
@@ -58,6 +64,7 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
+        print(f"error = {e}")
         return {
             "statusCode": 500,
             "headers": {

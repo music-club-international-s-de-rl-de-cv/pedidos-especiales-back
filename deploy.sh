@@ -33,4 +33,6 @@ sam deploy \
     SqlUser=$SQL_USER \
     SqlPass=$SQL_PASS \
     SqlDb=$SQL_DB \
-    SqlDbPrueba=$SQL_DB_PRUEBA
+    SqlDbPrueba=$SQL_DB_PRUEBA \
+    CollectionRecords=$COLLECTION_RECORDS \
+    CollectionWebhook=$COLLECTION_WEBHOOK \

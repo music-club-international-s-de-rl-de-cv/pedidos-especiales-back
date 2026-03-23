@@ -23,6 +23,10 @@ Parameters:
     Type: String
   CollectionOrders:
     Type: String
+  CollectionRecords:
+    Type: String
+  CollectionWebhook:
+    Type: String
 
 
   # ENV FOR LIVERPOOL-EPICOR
@@ -97,6 +101,10 @@ Resources:
                   - cognito-idp:GetGroup 
                   - cognito-idp:AdminListGroupsForUser
                   - cognito-idp:ListUsersInGroup
+                  - cognito-idp:AdminCreateUser      # ← agrega
+                  - cognito-idp:AdminDeleteUser      # ← agrega
+                  - cognito-idp:AdminRemoveUserFromGroup  # ← agrega (para removeFromGroup)
+                  - cognito-idp:AdminUpdateUserAttributes # ← agrega (por si acaso)
                 Resource: "*"
               - Effect: Allow
                 Action:
@@ -181,6 +189,26 @@ Resources:
 
   # -- Api Gateway Endpoints
 
+  OrderEpicor:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "OrderEpicor-${Environment}"
+      CodeUri: ./Endpoints/Epicor/
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRoleTrigger.Arn   # Asignación del rol con permisos de S3
+      Runtime: nodejs18.x
+      Environment:
+        Variables:
+          API_KEY_DEV_EPICOR:  !Ref ApiKeyDevEpicor
+          AUTH_GET_DESC_SP: !Ref AuthGetDescSp
+          URI_DEV_EPICOR: !Ref UriDevEpicor
+          URI_PROD_EPICOR: !Ref UriProdEpicor
+          ENVIRONMENT: !Ref Environment
+          DEVELOP_ENV: !Ref DevEnv
+          MONGO_URI: !Ref DBUri
+          BD_NAME: !Ref DBName
+          COLLECTION_ORDERS: !Ref CollectionOrders
+
   GetOrders:
     Type: AWS::Serverless::Function
     Properties:
@@ -239,7 +267,45 @@ Resources:
             RestApiId: !Ref PedidosEspecialesAPI
             Path: /getUsersGroups
             Method: GET
-  
+  CreateUser:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "CreateUserPE-${Environment}"
+      CodeUri: ./Endpoints/Users/CreateUser/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn
+      Runtime: python3.13
+      Timeout: 30
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref UserPoolPedidosEspeciales
+      Events:
+        CreateUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /createUser
+            Method: POST
+
+  DeleteUser:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "DeleteUserPE-${Environment}"
+      CodeUri: ./Endpoints/Users/DeleteUser/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn
+      Runtime: python3.13
+      Timeout: 30
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref UserPoolPedidosEspeciales
+      Events:
+        DeleteUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /deleteUser
+            Method: POST
   RequestPermissions:
     Type: AWS::Serverless::Function
     Properties:
@@ -280,7 +346,92 @@ Resources:
         Variables:
           COGNITO_USER_POOL_ID: !Ref UserPoolPedidosEspeciales
 
-  
+  GetOneOrder: 
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "GetOneOrder-${Environment}"
+      CodeUri: ./Endpoints/Orders/GetOneOrder/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn
+      Runtime: python3.13
+      Environment:
+        Variables:
+          MONGO_URI: !Ref DBUri
+          BD_NAME: !Ref DBName
+          COLLECTION_ORDERS: !Ref CollectionOrders
+      Events:
+        GetOneOrder:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /GetOneOrder
+            Method: GET
+
+  GetRecords:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "GetRecords-${Environment}"
+      CodeUri: ./Endpoints/Orders/GetRecords/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn
+      Runtime: python3.13
+      Environment:
+        Variables:
+          MONGO_URI: !Ref DBUri
+          BD_NAME: !Ref DBName
+          COLLECTION_RECORDS: !Ref CollectionRecords
+      Events:
+        GetRecords:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /GetRecords
+            Method: GET
+
+  GetWebhook:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "GetWebhook-${Environment}"
+      CodeUri: ./Endpoints/Orders/GetWebhook/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn
+      Runtime: python3.13
+      Environment:
+        Variables:
+          MONGO_URI: !Ref DBUri
+          BD_NAME: !Ref DBName
+          COLLECTION_WEBHOOK: !Ref CollectionWebhook
+      Events:
+        GetWebhook:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /GetWebhook
+            Method: GET
+
+  ReSendOrder: 
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "ReSendOrder-${Environment}"
+      CodeUri: ./Endpoints/Orders/ReSendOrder/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn
+      Runtime: python3.13
+      Environment:
+        Variables:
+          MONGO_URI: !Ref DBUri
+          BD_NAME: !Ref DBName
+          COLLECTION_ORDERS: !Ref CollectionOrders 
+          COLLECTION_WEBHOOK: !Ref CollectionWebhook
+          COLLECTION_RECORDS: !Ref CollectionRecords
+      Events:
+        ReSendOrder:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /ReSendOrder
+            Method: POST
+
   # -- Apsync functions
   # ResolverAppsync:
   #   Type: AWS::Serverless::Function
@@ -428,7 +579,107 @@ Resources:
                 type: "AWS_PROXY"
                 uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AcceptPermissions.Arn}/invocations"
                 passthroughBehavior: "when_no_match"
-          
+          /GetOneOrder:
+            get:
+              summary: "Recuperrar registros de una sola Orden"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Recuperrar registros de una sola Orden"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetOneOrder.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+          /GetRecords:
+            get:
+              summary: "Detalle de los procesos gestados en la plataforma"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Detalle de los procesos gestados en la plataforma"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetRecords.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+          /GetWebhook:
+            get:
+              summary: "Recuperacion de los detalles de las Ordenes Generadas"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Recuperacion de los detalles de las Ordenes Generadas"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetWebhook.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+          /ReSendOrder:
+            post:
+              summary: "Re-Envio de Ordenes Pendientes o Con falla"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "Re-Envio de Ordenes Pendientes o Con falla"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReSendOrder.Arn}/invocations"
+          /createUser:
+            post:
+              summary: "Creacion de un nuevo usuario"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "agregar usaurio"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateUser.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
+          /deleteUser:
+            post:
+                summary: "eliminar usuario"
+                produces:
+                  - "application/json"
+                responses:
+                  "200":
+                    description: "eliminar usaurio"
+                  "400":
+                    description: "Solicitud incorrecta"
+                  "500":
+                    description: "Error interno del servidor"
+                x-amazon-apigateway-integration:
+                  httpMethod: "POST"
+                  type: "AWS_PROXY"
+                  uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteUser.Arn}/invocations"
+                  passthroughBehavior: "when_no_match"
   # ------------------ API GATEWAY PERMISSIONS -----------
   ApiGatewayInvokeLambdaPermissionOrdersPe:
     Type: AWS::Lambda::Permission
@@ -465,6 +716,33 @@ Resources:
       FunctionName: !Ref AcceptPermissions
       Principal: "apigateway.amazonaws.com"
 
+  ApiGatewayInvokeLambdaPermissionGetOneOrder:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref GetOneOrder
+      Principal: "apigateway.amazonaws.com"
+
+  ApiGatewayInvokeLambdaPermissionGetRecords:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref GetRecords
+      Principal: "apigateway.amazonaws.com"
+
+  ApiGatewayInvokeLambdaPermissionGetWebhook:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref GetWebhook
+      Principal: "apigateway.amazonaws.com"
+
+  ApiGatewayInvokeLambdaPermissionReSendOrder:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref ReSendOrder
+      Principal: "apigateway.amazonaws.com"
 
   # ------------------ API GRAPHQL -----------
   # WSPedidosEspecialesApi:

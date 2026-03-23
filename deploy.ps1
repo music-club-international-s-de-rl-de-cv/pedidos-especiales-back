@@ -44,4 +44,6 @@ sam deploy `
     SqlUser=$env:SQL_USER `
     SqlPass=$env:SQL_PASS `
     SqlDb=$env:SQL_DB `
-    SqlDbPrueba=$env:SQL_DB_PRUEBA
+    SqlDbPrueba=$env:SQL_DB_PRUEBA `
+    CollectionRecords=$env:COLLECTION_RECORDS `
+    CollectionWebhook=$env:COLLECTION_WEBHOOK

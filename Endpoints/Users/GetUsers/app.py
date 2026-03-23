@@ -48,7 +48,7 @@ def get_user_groups(username):
 def lambda_handler(event, context):
     try:
         print("EVENT:", event)
-
+        print(f"USER_POOL_ID={USER_POOL_ID}")
         if event["httpMethod"] == "OPTIONS":
             return {
                 "statusCode": 200,
@@ -113,7 +113,7 @@ def lambda_handler(event, context):
         # Enriquecer cada usuario con sus grupos
         for user in users:
             user["Groups"] = get_user_groups(user["Username"])
-
+        print(f"user={user}")
         return {
             "statusCode": 200,
             "headers": {

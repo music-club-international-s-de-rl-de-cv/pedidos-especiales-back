@@ -250,3 +250,5 @@ node_modules/
 
 .aws-sam
 samconfig.prod.toml
+
+.npmrc
