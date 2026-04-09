@@ -48,6 +48,7 @@ def lambda_handler(event, context):
         print(f"function_name = {function_name}")
         if isinstance(body, list):
             result = collection_orders.insert_many(body)
+            body.pop("_id", None)
             # 
             lambda_response = lambda_client.invoke(
                 FunctionName=function_name,  
@@ -83,7 +84,7 @@ def lambda_handler(event, context):
         # Insertar una sola orden
         elif isinstance(body, dict):
             result = collection_orders.insert_one(body)
-
+            body.pop("_id", None)
             try:
                 lambda_response = lambda_client.invoke(
                     FunctionName=function_name,  
@@ -95,7 +96,7 @@ def lambda_handler(event, context):
             except Exception as invoke_error:
                 print(f"ERROR AL INVOCAR: {str(invoke_error)}")
                 bodyEpicor = {"ov_epicor": "", "internal_state": False}
-                
+
             order_data = {
                 "orderId": str(result.inserted_id),   # también: id es built-in, no el _id
                 "ov_epicor": bodyEpicor.get("ov_epicor", ""),
