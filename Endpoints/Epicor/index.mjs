@@ -271,11 +271,7 @@ export const handler = async (event) => {
             statusCode: 200,
             body: JSON.stringify(result)
         }
-        // resultGeneral = {ov_epicor: 11115, internal_state: true}
-        // return {
-        //     statusCode: 200,
-        //     body: JSON.stringify({ov_epicor: 11115, internal_state: true})
-        // }
+        
 
     } catch (error) {
         console.error("Unhandled error in Lambda:", error);
