@@ -88,8 +88,7 @@ def lambda_handler(event, context):
                 lambda_response = lambda_client.invoke(
                     FunctionName=function_name,  
                     InvocationType="RequestResponse",
-                    Payload=json.dumps({"order": body})
-                )
+                    Payload=json.dumps({"order": body}, default=str)                    )
                 response_payload = json.loads(lambda_response["Payload"].read())
                 bodyEpicor = json.loads(response_payload.get("body", "{}"))
             except Exception as invoke_error:
