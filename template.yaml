@@ -197,6 +197,8 @@ Resources:
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRoleTrigger.Arn   # Asignación del rol con permisos de S3
       Runtime: nodejs18.x
+      Timeout: 60        # ← Agrega esto
+      MemorySize: 256
       Environment:
         Variables:
           API_KEY_DEV_EPICOR:  !Ref ApiKeyDevEpicor
@@ -222,6 +224,7 @@ Resources:
           MONGO_URI: !Ref DBUri
           BD_NAME: !Ref DBName
           COLLECTION_ORDERS: !Ref CollectionOrders
+          ENVIRONMENT: !Ref Environment
       Events:
         GetOrders:
           Type: Api
@@ -229,6 +232,30 @@ Resources:
             RestApiId: !Ref PedidosEspecialesAPI
             Path: /getOrdersPe
             Method: GET
+
+  CatchOrders:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "CatchOrdersPE-${Environment}"
+      CodeUri: ./Endpoints/Orders/CatchOrdersPE/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRoleS3.Arn   # Asignación del rol con permisos de S3
+      Runtime: python3.13
+      Timeout: 60
+      MemorySize: 128
+      Events:
+        CatchOrders:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /catchOrdersPe
+            Method: POST
+      Environment:
+        Variables:
+          MONGO_URI: !Ref DBUri
+          BD_NAME: !Ref DBName
+          COLLECTION_ORDERS: !Ref CollectionOrders
+          ENVIRONMENT: !Ref Environment
 
   GetUsers:
     Type: AWS::Serverless::Function
@@ -633,11 +660,13 @@ Resources:
           /ReSendOrder:
             post:
               summary: "Re-Envio de Ordenes Pendientes o Con falla"
+              consumes:
+                - "application/json"
               produces:
                 - "application/json"
               responses:
                 "200":
-                  description: "Re-Envio de Ordenes Pendientes o Con falla"
+                  description: "éxito"
                 "400":
                   description: "Solicitud incorrecta"
                 "500":
@@ -646,6 +675,25 @@ Resources:
                 httpMethod: "POST"
                 type: "AWS_PROXY"
                 uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReSendOrder.Arn}/invocations"
+          /catchOrdersPe:
+            post:
+              summary: "Catchde b2b orders"
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "éxito"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CatchOrders.Arn}/invocations"
+                passthroughBehavior: "when_no_match"
           /createUser:
             post:
               summary: "Creacion de un nuevo usuario"
@@ -680,6 +728,8 @@ Resources:
                   type: "AWS_PROXY"
                   uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteUser.Arn}/invocations"
                   passthroughBehavior: "when_no_match"
+                  
+          
   # ------------------ API GATEWAY PERMISSIONS -----------
   ApiGatewayInvokeLambdaPermissionOrdersPe:
     Type: AWS::Lambda::Permission
@@ -742,6 +792,13 @@ Resources:
     Properties:
       Action: "lambda:InvokeFunction"
       FunctionName: !Ref ReSendOrder
+      Principal: "apigateway.amazonaws.com"
+      
+  ApiGatewayInvokeLambdaPermissionCatchOrdersPe:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref CatchOrders
       Principal: "apigateway.amazonaws.com"
 
   # ------------------ API GRAPHQL -----------
