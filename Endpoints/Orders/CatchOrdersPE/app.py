@@ -3,7 +3,8 @@ import os
 import pymongo
 import boto3
 
-lambda_client = boto3.client("lambda")
+# lambda_client = boto3.client("lambda")
+lambda_client = boto3.client("lambda", region_name="us-east-1")
 
 # Configuración de MongoDB
 MONGO_URI = os.environ.get("MONGO_URI")
@@ -83,13 +84,18 @@ def lambda_handler(event, context):
         elif isinstance(body, dict):
             result = collection_orders.insert_one(body)
 
-            lambda_response = lambda_client.invoke(
-                FunctionName=function_name,  
-                InvocationType="RequestResponse",
-                Payload=json.dumps({"order": body})
-            )
-            response_payload = json.loads(lambda_response["Payload"].read())
-            bodyEpicor = json.loads(response_payload.get("body", "{}"))
+            try:
+                lambda_response = lambda_client.invoke(
+                    FunctionName=function_name,  
+                    InvocationType="RequestResponse",
+                    Payload=json.dumps({"order": body})
+                )
+                response_payload = json.loads(lambda_response["Payload"].read())
+                bodyEpicor = json.loads(response_payload.get("body", "{}"))
+            except Exception as invoke_error:
+                print(f"ERROR AL INVOCAR: {str(invoke_error)}")
+                bodyEpicor = {"ov_epicor": "", "internal_state": False}
+                
             order_data = {
                 "orderId": str(result.inserted_id),   # también: id es built-in, no el _id
                 "ov_epicor": bodyEpicor.get("ov_epicor", ""),
