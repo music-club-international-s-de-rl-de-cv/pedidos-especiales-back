@@ -8,6 +8,5 @@ region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_NAMED_IAM"
 
-parameter_overrides = "Environment=\"develop\" DBUri=\"\" DBName=\"\" CollectionResponse=\"\" CollectionOrders=\"\" DevEnv=\"\" ApiKeyDevEpicor=\"\" AuthDevEpicor=\"\" UriDevEpicor=\"\" ApiKeyProdEpicor=\"\" UriProdEpicor=\"\" AuthGetDescSp=\"\" SqlServer=\"\" SqlUser=\"\" SqlPass=\"\" SqlDb=\"\" SqlDbPrueba=\"\""
-
-image_repositories = []
+parameter_overrides = "Environment=\"develop\" DBUri=\"\" DBName=\"\" CollectionResponse=\"\" CollectionOrders=\"\" DevEnv=\"\" ApiKeyDevEpicor=\"\" AuthDevEpicor=\"\" UriDevEpicor=\"\" ApiKeyProdEpicor=\"\" UriProdEpicor=\"\" AuthGetDescSp=\"\" SqlServer=\"\" SqlUser=\"\" SqlPass=\"\" SqlDb=\"\" SqlDbPrueba=\"\" CollectionRecords=\"\" CollectionWebhook=\"\""
+image_repositories = [] 
