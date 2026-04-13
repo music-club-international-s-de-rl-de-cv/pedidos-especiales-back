@@ -197,8 +197,8 @@ Resources:
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRoleTrigger.Arn   # Asignación del rol con permisos de S3
       Runtime: nodejs18.x
-      Timeout: 60        # ← Agrega esto
-      MemorySize: 256
+      Timeout: 300        # ← Agrega esto
+      MemorySize: 300
       Environment:
         Variables:
           API_KEY_DEV_EPICOR:  !Ref ApiKeyDevEpicor
@@ -241,8 +241,8 @@ Resources:
       Handler: app.lambda_handler
       Role: !GetAtt LambdaExecutionRoleS3.Arn   # Asignación del rol con permisos de S3
       Runtime: python3.13
-      Timeout: 60
-      MemorySize: 128
+      Timeout: 300
+      MemorySize: 300
       Events:
         CatchOrders:
           Type: Api

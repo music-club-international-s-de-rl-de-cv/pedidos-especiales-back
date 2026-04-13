@@ -45,30 +45,17 @@ def lambda_handler(event, context):
         body = json.loads(event.get("body", "{}"))
 
         # Insertar múltiples órdenes
-        print(f"function_name = {function_name}")
+        
         if isinstance(body, list):
+            print('body__list')
             result = collection_orders.insert_many(body)
-            body.pop("_id", None)
-            # 
-            lambda_response = lambda_client.invoke(
-                FunctionName=function_name,  
-                InvocationType="RequestResponse",
-                Payload=json.dumps({"order": body})
-            )
-            response_payload = json.loads(lambda_response["Payload"].read())
-            bodyEpicor = json.loads(response_payload.get("body", "{}"))
-            order_data = {
-                "orderId": str(result.inserted_id),   # también: id es built-in, no el _id
-                "ov_epicor": bodyEpicor.get("ov_epicor", ""),
-                "internal_state": bodyEpicor.get("internal_state", 0),
-                "statusOrder": 'Complete' if bodyEpicor.get("internal_state") == True else 'Error'
-            }
-            print(f"ov_epicor = {order_data['ov_epicor']}")
-            # if bodyEpicor.get("internal_state", 0) == True:
-            #     ordersComplet.append(order_data)
-            # else:
-            #     ordersFail.append(order_data)
-            # 
+            for _body in body:
+                _body.pop("_id", None) 
+                lambda_client.invoke(
+                    FunctionName=function_name,  
+                    InvocationType="Event",
+                    Payload=json.dumps({"order": _body})
+                )
 
             return {
                 "statusCode": 200,
@@ -83,35 +70,20 @@ def lambda_handler(event, context):
 
         # Insertar una sola orden
         elif isinstance(body, dict):
+            print('body__dict')
             result = collection_orders.insert_one(body)
             body.pop("_id", None)
             try:
-                lambda_response = lambda_client.invoke(
+                lambda_client.invoke(
                     FunctionName=function_name,  
-                    InvocationType="RequestResponse",
+                    InvocationType="Event",
                     Payload=json.dumps({"order": body})
                 )
-                response_payload = json.loads(lambda_response["Payload"].read())
-                bodyEpicor = json.loads(response_payload.get("body", "{}"))
+                
             except Exception as invoke_error:
                 print(f"ERROR AL INVOCAR: {str(invoke_error)}")
                 bodyEpicor = {"ov_epicor": "", "internal_state": False}
-
-            order_data = {
-                "orderId": str(result.inserted_id),   # también: id es built-in, no el _id
-                "ov_epicor": bodyEpicor.get("ov_epicor", ""),
-                "internal_state": bodyEpicor.get("internal_state", 0),
-                "statusOrder": 'Complete' if bodyEpicor.get("internal_state") == True else 'Error'
-            }
-            print(f"ov_epicor = {order_data['ov_epicor']}")
-            collection_orders.update_one(
-                {"_id": result.inserted_id},
-                {"$set": {
-                    "ov_epicor": bodyEpicor.get("ov_epicor", ""),
-                    "internal_state": bodyEpicor.get("internal_state", 0)
-                }}
-            )
-            
+          
             # if bodyEpicor.get("internal_state", 0) == True:
             #     ordersComplet.append(order_data)
             # else:
@@ -135,6 +107,7 @@ def lambda_handler(event, context):
             }
 
     except Exception as e:
+        print(f"error = {e}")
         return {
             "statusCode": 500,
             "headers": {
