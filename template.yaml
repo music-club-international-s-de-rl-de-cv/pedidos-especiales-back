@@ -27,8 +27,14 @@ Parameters:
     Type: String
   CollectionWebhook:
     Type: String
+  CollectionB2BProduct:
+    Type: String
+  CollectionB2BPrice:
+    Type: String
 
-
+  # URL API BY 115
+  apiUrlBase115:
+    Type: String
   # ENV FOR LIVERPOOL-EPICOR
   DevEnv:
     Type: String
@@ -57,7 +63,11 @@ Parameters:
   SqlDbPrueba:
     Type: String
 
-
+  #ShopifyDEV
+  HostNameShopifyDev:
+    Type: String
+  AccessTokenShopifyDev:
+    Type: String
  
 Resources:
   # ------------------ Roles ----------- 
@@ -459,6 +469,33 @@ Resources:
             Path: /ReSendOrder
             Method: POST
 
+  IventorySync:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "IventorySync-${Environment}"
+      CodeUri: ./Endpoints/Sync/Inventory/
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRoleTrigger.Arn   # Asignación del rol con permisos de S3
+      Runtime: nodejs18.x
+      Timeout: 300        # ← Agrega esto
+      MemorySize: 300
+      Environment:
+        Variables:
+          API_115_URL_BASE:  !Ref apiUrlBase115
+          ENVIRONMENT: !Ref Environment
+          DEVELOP_ENV: !Ref DevEnv
+          MONGO_URI: !Ref DBUri
+          BD_NAME: !Ref DBName
+          HOSTNAME_SHOPIFY_DEV: !Ref HostNameShopifyDev
+          ACCESSTOKEN_SHOPIFY_DEV: !Ref AccessTokenShopifyDev
+      Events:
+        IventorySync:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PedidosEspecialesAPI
+            Path: /IventorySync
+            Method: POST
+          # COLLECTION_B2B_PRODUCT: !Ref CollectionB2BProduct
   # -- Apsync functions
   # ResolverAppsync:
   #   Type: AWS::Serverless::Function
@@ -728,7 +765,26 @@ Resources:
                   type: "AWS_PROXY"
                   uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteUser.Arn}/invocations"
                   passthroughBehavior: "when_no_match"
-                  
+          /IventorySync:
+            post:
+              summary: "actualizar el stock a peticion de usuario"
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "éxito"
+                "400":
+                  description: "Solicitud incorrecta"
+                "500":
+                  description: "Error interno del servidor"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${IventorySync.Arn}/invocations"
+
+              
           
   # ------------------ API GATEWAY PERMISSIONS -----------
   ApiGatewayInvokeLambdaPermissionOrdersPe:
@@ -801,6 +857,12 @@ Resources:
       FunctionName: !Ref CatchOrders
       Principal: "apigateway.amazonaws.com"
 
+  ApiGatewayInvokeLambdaPermissionIventorySync:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref IventorySync
+      Principal: "apigateway.amazonaws.com"
   # ------------------ API GRAPHQL -----------
   # WSPedidosEspecialesApi:
   #   Type: AWS::AppSync::GraphQLApi

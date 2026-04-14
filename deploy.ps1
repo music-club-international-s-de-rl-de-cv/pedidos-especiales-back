@@ -46,4 +46,9 @@ sam deploy `
     SqlDb=$env:SQL_DB `
     SqlDbPrueba=$env:SQL_DB_PRUEBA `
     CollectionRecords=$env:COLLECTION_RECORDS `
-    CollectionWebhook=$env:COLLECTION_WEBHOOK
+    CollectionWebhook=$env:COLLECTION_WEBHOOK `
+    apiUrlBase115=$env:API_115_URL_BASE `
+    CollectionB2BProduct=$env:COLLECTION_B2B_PRODUCT `
+    CollectionB2BPrice=$env:COLLECTION_B2B_PRICES `
+    HostNameShopifyDev=$env:HOSTNAME_SHOPIFY_DEV `
+    AccessTokenShopifyDev=$env:ACCESSTOKEN_SHOPIFY_DEV 
