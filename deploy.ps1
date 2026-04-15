@@ -50,5 +50,6 @@ sam deploy `
     apiUrlBase115=$env:API_115_URL_BASE `
     CollectionB2BProduct=$env:COLLECTION_B2B_PRODUCT `
     CollectionB2BPrice=$env:COLLECTION_B2B_PRICES `
+    CollectionB2BProcess=$env:COLLECTION_B2B_PROCESS `
     HostNameShopifyDev=$env:HOSTNAME_SHOPIFY_DEV `
-    AccessTokenShopifyDev=$env:ACCESSTOKEN_SHOPIFY_DEV 
+    AccessTokenShopifyDev=$env:ACCESSTOKEN_SHOPIFY_DEV
