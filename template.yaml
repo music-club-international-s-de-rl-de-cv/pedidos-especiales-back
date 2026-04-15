@@ -220,6 +220,7 @@ Resources:
           MONGO_URI: !Ref DBUri
           BD_NAME: !Ref DBName
           COLLECTION_ORDERS: !Ref CollectionOrders
+          API_115_URL_BASE:  !Ref apiUrlBase115
 
   GetOrders:
     Type: AWS::Serverless::Function
@@ -477,8 +478,8 @@ Resources:
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRoleTrigger.Arn   # Asignación del rol con permisos de S3
       Runtime: nodejs18.x
-      Timeout: 300        # ← Agrega esto
-      MemorySize: 300
+      Timeout: 500        # ← Agrega esto
+      MemorySize: 512
       Environment:
         Variables:
           API_115_URL_BASE:  !Ref apiUrlBase115

@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const ProcessSchema = new mongoose.Schema({
+const ProcessDataSchema = new mongoose.Schema({
   sku:                { type: String,  required: true },
   // campos de inventoryProcess
   oldQuantity:        { type: Number,  default: null },
@@ -15,17 +15,17 @@ const ProcessSchema = new mongoose.Schema({
   message:            { type: String,  required: true },
 }, { _id: false });
 
-const InventorySchema = new mongoose.Schema({
+const ProcessSchema = new mongoose.Schema({
   processId:   { type: String,          required: true },
-  process:     { type: [ProcessSchema], required: true },
+  process:     { type: [ProcessDataSchema], required: true },
   createdAt:   { type: String,          required: true },
   user_system: { type: String,          required: true },
   taskName:    { type: String,          required: true },
 }, { timestamps: true });
 
 // Evita volver a compilar el modelo si ya existe
-const InventoryModel = mongoose.models.Error || mongoose.model('b2b_process', InventorySchema);
+const ProcessModel = mongoose.models.b2b_process || mongoose.model('b2b_process', ProcessSchema);
 
-export default InventoryModel; 
+export default ProcessModel; 
     // process: inventoryProcess[] | pricesProcess[],
  
